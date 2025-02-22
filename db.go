@@ -77,45 +77,50 @@ func (this *psqlAdapter) createCheck(chk *check) error {
 	return nil
 }
 
-func (this *psqlAdapter) listUserChecks(userId int64, offset int) ([]check, error) {
+func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64) ([]check, error) {
 	conn, err := this.connect()
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
 	rows, err := conn.Query(
-		`SELECT 
+		`WITH check_updates AS (
+			SELECT DISTINCT ON(check_id)
+				c.check_id,
+				coalesce(a.result,0) AS result,
+				CASE WHEN a.created_at IS NULL THEN c.created_at ELSE a.created_at END AS updated_at
+		  	FROM checks c
+			LEFT JOIN attempts a
+			ON c.check_id = a.check_id
+			WHERE c.created_by_user = $1
+			ORDER BY check_id, updated_at DESC
+		)
+		SELECT 
 			c.check_id,
 			c.skill,
 			c.difficulty,
 			c.type,
 			c.description,
-			coalesce(a.result,0) AS result,
-			CASE WHEN a.created_at IS NULL THEN c.created_at ELSE a.created_at END AS updated_at
-		FROM checks c
-		LEFT JOIN 
-		( 
-			SELECT DISTINCT ON(check_id)
-				check_id,
-				result,
-				created_at
-		  	FROM attempts
-			ORDER BY check_id, created_at DESC
-		) a
-		ON a.check_id = c.check_id
-		WHERE c.created_by_user = $1
-		AND c.check_id > $2
+			u.result
+		FROM checks c 
+		JOIN check_updates u 
+		ON c.check_id = u.check_id 
+		WHERE u.updated_at > coalesce(
+		(
+			SELECT updated_at
+			FROM check_updates
+			WHERE check_id = $2
+		), to_timestamp(0))
 		ORDER BY updated_at DESC
-		LIMIT $3;
-		`,
+		LIMIT $3;`,
 		userId,
-		offset,
+		offsetId,
 		maxChecksAtListPage)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var result []check
+	result := make([]check, 0)
 	for rows.Next() {
 		chk := check{}
 		if err := moveCorresponding(rows, &chk); err != nil {

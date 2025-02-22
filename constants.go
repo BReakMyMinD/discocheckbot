@@ -4,6 +4,7 @@ const maxChecksAtListPage int = 9
 
 // commands
 const (
+	start    string = "start"
 	addWhite string = "white"
 	addRed   string = "red"
 	seeTop   string = "top"
@@ -123,3 +124,9 @@ var typeNames = [3]string{
 	"Red check",
 	"White check",
 }
+
+const (
+	listCheckDetail = iota
+	listCheckPrevious
+	listCheckNext
+)

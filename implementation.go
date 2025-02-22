@@ -6,13 +6,12 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"time"
 )
 
 type dbAdapter interface {
 	createCheck(chk *check) error
 	init() error
-	listUserChecks(userId int64, offset int) ([]check, error)
+	listUserChecks(userId int64, offsetId int64) ([]check, error)
 	readCheck(checkId int64) (check, error)
 }
 
@@ -70,6 +69,8 @@ func (this *DiscoCheckBot) OnMessage(bot *api.Bot, msg *api.Message) error {
 	} else {
 		delete(this.checkBuffer, msg.Sender.ID)
 		switch command {
+		case start:
+			bot.SendMessage(getStartMessage(msg.Chat.ID))
 		case addWhite:
 			bot.SendMessage(getSkillMessage(command, msg.Chat.ID, typRetriable))
 		case addRed:
@@ -104,14 +105,31 @@ func (this *DiscoCheckBot) OnCallbackQuery(bot *api.Bot, cbq *api.CallbackQuery)
 			bot.EditMessageText(getSkillDifEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, cbq.Data))
 			return nil
 		case seeTop:
-			chk, err := this.displayCheck(cbq, callbackParams)
-			if err != nil {
-				bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
-			} else {
-				bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
-				bot.EditMessageText(api.EditMessageText(getSingleCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, cbq.Data, chk)))
+			if oper, err := strconv.Atoi(callbackParams[1]); err != nil {
+				switch oper {
+				case listCheckDetail:
+					chk, err := this.displayCheck(cbq, callbackParams)
+					if err != nil {
+						bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
+					} else {
+						bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
+						bot.EditMessageText(getSingleCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, cbq.Data, chk))
+					}
+					return err
+				//case listCheckPrevious:
+				//	fallthrough
+				case listCheckNext:
+					list, err := this.updateListPage(cbq, callbackParams)
+					if err != nil {
+						bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
+					} else {
+						bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
+						bot.EditMessageText(getListCheckEditMessage(cbq.Message, list))
+					}
+					return err
+				}
 			}
-			return err
+			fallthrough
 		default:
 			err := fmt.Errorf("invalid callback data")
 			bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
@@ -177,7 +195,23 @@ func (this *DiscoCheckBot) receiveNewCheckName(msg *api.Message) (check, error) 
 }
 
 func (this *DiscoCheckBot) displayCheck(cbq *api.CallbackQuery, clbkPar []string) (check, error) {
-	return check{}, nil
+	var chk check
+	var err error
+	if chk.Id, err = strconv.ParseInt(clbkPar[2], 10, 64); err != nil {
+		return chk, err
+	}
+	return this.db.readCheck(chk.Id)
+}
+
+func (this *DiscoCheckBot) updateListPage(cbq *api.CallbackQuery, clbkPar []string) ([]check, error) {
+	var borderChkId int64
+	list := make([]check, 0)
+	var err error
+	if borderChkId, err = strconv.ParseInt(clbkPar[2], 10, 64); err != nil {
+		return list, err
+	}
+
+	return this.db.listUserChecks(cbq.Sender.ID, borderChkId)
 }
 
 // func (this *DiscoCheckBot) showListCheckInitialPage(userId int64) error {
@@ -189,131 +223,3 @@ func (this *DiscoCheckBot) displayCheck(cbq *api.CallbackQuery, clbkPar []string
 
 // 	}
 // }
-
-func getSkillMessage(cmd string, chatId int64, chkColor int) api.SendMessage {
-	smsg := api.SendMessage{
-		ChatID: chatId,
-		Text:   "select skill:",
-		ReplyMarkup: &api.InlineKeyboardMarkup{
-			InlineKeyboard: [][]api.InlineKeyboardButton{
-				{{Text: skillNames[intLogic], CallbackData: makeClbk(cmd, chkColor, intLogic)},
-					{Text: skillNames[intEncyclopedia], CallbackData: makeClbk(cmd, chkColor, intEncyclopedia)}},
-				{{Text: skillNames[intRhetoric], CallbackData: makeClbk(cmd, chkColor, intRhetoric)},
-					{Text: skillNames[intDrama], CallbackData: makeClbk(cmd, chkColor, intDrama)}},
-				{{Text: skillNames[intConcept], CallbackData: makeClbk(cmd, chkColor, intConcept)},
-					{Text: skillNames[intVisual], CallbackData: makeClbk(cmd, chkColor, intEncyclopedia)}},
-				{{Text: skillNames[psyVolition], CallbackData: makeClbk(cmd, chkColor, psyVolition)},
-					{Text: skillNames[psyInland], CallbackData: makeClbk(cmd, chkColor, psyInland)}},
-				{{Text: skillNames[psyEmpathy], CallbackData: makeClbk(cmd, chkColor, psyEmpathy)},
-					{Text: skillNames[psyAuthority], CallbackData: makeClbk(cmd, chkColor, psyAuthority)}},
-				{{Text: skillNames[psyEsprit], CallbackData: makeClbk(cmd, chkColor, psyEsprit)},
-					{Text: skillNames[psySuggestion], CallbackData: makeClbk(cmd, chkColor, psySuggestion)}},
-				{{Text: skillNames[phyEndurance], CallbackData: makeClbk(cmd, chkColor, phyEndurance)},
-					{Text: skillNames[phyPain], CallbackData: makeClbk(cmd, chkColor, phyPain)}},
-				{{Text: skillNames[phyInstrument], CallbackData: makeClbk(cmd, chkColor, phyInstrument)},
-					{Text: skillNames[phyElectrochem], CallbackData: makeClbk(cmd, chkColor, phyElectrochem)}},
-				{{Text: skillNames[phyShivers], CallbackData: makeClbk(cmd, chkColor, phyShivers)},
-					{Text: skillNames[phyHalflight], CallbackData: makeClbk(cmd, chkColor, phyHalflight)}},
-				{{Text: skillNames[motCoordintation], CallbackData: makeClbk(cmd, chkColor, motCoordintation)},
-					{Text: skillNames[motPerception], CallbackData: makeClbk(cmd, chkColor, motPerception)}},
-				{{Text: skillNames[motReaction], CallbackData: makeClbk(cmd, chkColor, motReaction)},
-					{Text: skillNames[motSavoir], CallbackData: makeClbk(cmd, chkColor, motSavoir)}},
-				{{Text: skillNames[motInterfacing], CallbackData: makeClbk(cmd, chkColor, motInterfacing)},
-					{Text: skillNames[motComposure], CallbackData: makeClbk(cmd, chkColor, motComposure)}},
-			},
-		},
-	}
-	return smsg
-}
-
-func getSkillDifEditMessage(chatId int64, msgId int, clbk string) api.EditMessageText {
-	emsg := api.EditMessageText{
-		ChatID:    chatId,
-		MessageID: msgId,
-		Text:      "select check difficulty:",
-		ReplyMarkup: &api.InlineKeyboardMarkup{
-			InlineKeyboard: [][]api.InlineKeyboardButton{
-				{{Text: difficultyNames[difTrivial], CallbackData: makeClbk(clbk, difTrivial)}},
-				{{Text: difficultyNames[difEasy], CallbackData: makeClbk(clbk, difEasy)}},
-				{{Text: difficultyNames[difMedium], CallbackData: makeClbk(clbk, difMedium)}},
-				{{Text: difficultyNames[difChallenging], CallbackData: makeClbk(clbk, difChallenging)}},
-				{{Text: difficultyNames[difFormidable], CallbackData: makeClbk(clbk, difFormidable)}},
-				{{Text: difficultyNames[difLegendary], CallbackData: makeClbk(clbk, difLegendary)}},
-				{{Text: difficultyNames[difHeroic], CallbackData: makeClbk(clbk, difHeroic)}},
-				{{Text: difficultyNames[difGodly], CallbackData: makeClbk(clbk, difGodly)}},
-				{{Text: difficultyNames[difImpossible], CallbackData: makeClbk(clbk, difImpossible)}},
-			},
-		},
-	}
-	return emsg
-}
-
-func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage {
-
-	smsg := api.SendMessage{}
-	return smsg
-}
-
-func getSingleCheckEditMessage(chatId int64, msgId int, clbk string, chk check) api.EditMessageText {
-
-	emsg := api.EditMessageText{}
-	return emsg
-}
-
-func getSingleCheckMessage(chatId int64, chk check) api.SendMessage {
-	smsg := api.SendMessage{
-		ChatID: chatId,
-		Text: typeNames[chk.Typ] + ":\n" + skillNames[chk.Skill] + "/" + difficultyNames[chk.Difficulty] +
-			"\n" + chk.Description + "\n\nCreated at: " + chk.CreatedAt.Format(time.DateTime),
-	}
-	return smsg
-}
-
-func getSkillTxtEditMessage(chatId int64, msgId int, chk check) api.EditMessageText {
-	emsg := api.EditMessageText{
-		ChatID:    chatId,
-		MessageID: msgId,
-		Text:      "enter descrption of the check:\n" + skillNames[chk.Skill] + "/" + difficultyNames[chk.Difficulty],
-	}
-	return emsg
-}
-
-func getErrorMessage(chatId int64, err error) api.SendMessage {
-	smsg := api.SendMessage{
-		ChatID: chatId,
-		Text:   fmt.Sprintf("update was not handled due to:\n%s", err.Error()),
-	}
-	return smsg
-}
-
-func getCbqAnswer(cbqId string, text string) api.AnswerCallbackQuery {
-	answer := api.AnswerCallbackQuery{
-		CallbackQueryId: cbqId,
-		Text:            text,
-	}
-	return answer
-}
-
-func getErrorCbqAnswer(cbqId string, err error) api.AnswerCallbackQuery {
-	answer := api.AnswerCallbackQuery{
-		CallbackQueryId: cbqId,
-		Text:            err.Error(),
-		ShowAlert:       true,
-	}
-	return answer
-}
-
-func makeClbk(start string, params ...int) string {
-	var sb strings.Builder
-
-	for i := 0; i < len(params); i++ {
-		if i > 0 || start == "" {
-			sb.WriteString("/")
-		} else {
-			sb.WriteString(start)
-			sb.WriteString("/")
-		}
-		sb.WriteString(strconv.Itoa(params[i]))
-	}
-	return sb.String()
-}

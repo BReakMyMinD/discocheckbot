@@ -70,13 +70,10 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 	var btnList [][]api.InlineKeyboardButton
 	var btnRow []api.InlineKeyboardButton
 	var listText string
-	var newestId, oldestId int64
 	if len(list) > 0 {
-		newestId = list[0].Id
-		oldestId = list[len(list)-1].Id
 		btnRow = []api.InlineKeyboardButton{
-			{Text: "⬅️ newer", CallbackData: makeClbk(cmd, listCheckPrevious, newestId)},
-			{Text: "older ➡️", CallbackData: makeClbk(cmd, listCheckNext, oldestId)},
+			{Text: "⬅️ newer", CallbackData: makeClbk(cmd, listCheckNext, 0)},
+			{Text: "older ➡️", CallbackData: makeClbk(cmd, listCheckNext, list[len(list)-1].Id)},
 		}
 		btnList = append(btnList, btnRow)
 		btnRow = nil
@@ -106,6 +103,11 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 		},
 	}
 	return smsg
+}
+
+func getListCheckEditMessage(msg *api.Message, list []check) api.EditMessageText {
+	emsg := api.EditMessageText{}
+	return emsg
 }
 
 func getSingleCheckEditMessage(chatId int64, msgId int, clbk string, chk check) api.EditMessageText {
