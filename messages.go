@@ -70,10 +70,16 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 	var btnList [][]api.InlineKeyboardButton
 	var btnRow []api.InlineKeyboardButton
 	var listText string
+	var nextId int64
 	if len(list) > 0 {
+		if len(list) < maxChecksAtListPage {
+			nextId = 0
+		} else {
+			nextId = list[len(list)-1].Id
+		}
 		btnRow = []api.InlineKeyboardButton{
 			{Text: "⬅️ newer", CallbackData: makeClbk(cmd, listCheckNext, 0)},
-			{Text: "older ➡️", CallbackData: makeClbk(cmd, listCheckNext, list[len(list)-1].Id)},
+			{Text: "older ➡️", CallbackData: makeClbk(cmd, listCheckNext, nextId, 0)},
 		}
 		btnList = append(btnList, btnRow)
 		btnRow = nil
@@ -81,16 +87,20 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 		listText = "You have no checks at the moment"
 	}
 	for i, chk := range list {
+		res := 0
+		if chk.closed() {
+			res = chk.Attempts[len(chk.Attempts)-1].Result
+		}
 		listText = concat(
-			listText, strconv.Itoa(i+1), ". ", typeNames[chk.Typ],
+			listText, strconv.Itoa(i+1), ". ", typeNames[chk.Typ], " ", resultNames[res],
 			"\n", skillNames[chk.Skill], "/",
-			difficultyNames[chk.Difficulty], "\n",
-			chk.Description, "\n\n")
+			difficultyNames[chk.Difficulty],
+			"\n", chk.Description, "\n\n")
 		btnRow = append(btnRow, api.InlineKeyboardButton{
 			Text:         strconv.Itoa(i + 1),
 			CallbackData: makeClbk(cmd, listCheckDetail, chk.Id),
 		})
-		if (i+1)%3 == 0 || i+1 == len(list) {
+		if (i+1)%3 == 0 || i+1 == len(list) { //todo constant max buttons
 			btnList = append(btnList, btnRow)
 			btnRow = nil
 		}
@@ -105,8 +115,27 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 	return smsg
 }
 
-func getListCheckEditMessage(msg *api.Message, list []check) api.EditMessageText {
-	emsg := api.EditMessageText{}
+func getListCheckEditMessage(chatId int64, msgId int, list []check, clbkPar []string) api.EditMessageText {
+	baseMsg := getListCheckMessage(seeTop, chatId, list)
+	var reqId, prevId, nextId int64
+	prevId, _ = strconv.ParseInt(clbkPar[len(clbkPar)-1], 10, 64)
+	reqId, _ = strconv.ParseInt(clbkPar[2], 10, 64)
+
+	if len(list) < maxChecksAtListPage {
+		nextId = reqId
+		reqId = prevId
+	} else {
+		nextId = list[len(list)-1].Id
+	}
+	baseMsg.ReplyMarkup.InlineKeyboard[0][0].CallbackData = makeClbk(seeTop, listCheckNext, prevId)
+	baseMsg.ReplyMarkup.InlineKeyboard[0][1].CallbackData = makeClbk(seeTop, listCheckNext, nextId, reqId)
+
+	emsg := api.EditMessageText{
+		ChatID:      chatId,
+		MessageID:   msgId,
+		Text:        baseMsg.Text,
+		ReplyMarkup: baseMsg.ReplyMarkup,
+	}
 	return emsg
 }
 

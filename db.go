@@ -105,12 +105,12 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64) ([]check, 
 		FROM checks c 
 		JOIN check_updates u 
 		ON c.check_id = u.check_id 
-		WHERE u.updated_at > coalesce(
+		WHERE u.updated_at < coalesce(
 		(
 			SELECT updated_at
 			FROM check_updates
 			WHERE check_id = $2
-		), to_timestamp(0))
+		), to_timestamp('9999','YYYY'))
 		ORDER BY updated_at DESC
 		LIMIT $3;`,
 		userId,

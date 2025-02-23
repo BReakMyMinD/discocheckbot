@@ -78,6 +78,7 @@ func (this *Bot) ListenForUpdates() {
 			this.httpTimeout,
 			[]string{"message", "callback_query"},
 		}
+		log.Printf("requesting updates from %d", this.updatesOffset)
 		updates, err := callApiMethod[RequestUpdates, []Update](this.prepareApiUrl("getUpdates", ""), requestBody)
 		if err != nil {
 			log.Println(err)
@@ -88,11 +89,15 @@ func (this *Bot) ListenForUpdates() {
 			if update.UpdateID >= this.updatesOffset {
 				if update.CallbackQuery != nil {
 					if err = this.implementation.OnCallbackQuery(this, update.CallbackQuery); err != nil {
-						this.log.Println(err)
+						this.log.Printf("BOT ERROR: update %d from user %d %s\n%s", update.UpdateID, update.CallbackQuery.Sender.ID, update.CallbackQuery.Sender.UserName, err.Error())
+					} else {
+						this.log.Printf("BOT INFO: update %d from user %d %s", update.UpdateID, update.CallbackQuery.Sender.ID, update.CallbackQuery.Sender.UserName)
 					}
 				} else if update.Message != nil {
 					if err = this.implementation.OnMessage(this, update.Message); err != nil {
-						this.log.Println(err)
+						this.log.Printf("BOT ERROR: update %d from user %d %s\n%s", update.UpdateID, update.Message.Sender.ID, update.Message.Sender.UserName, err.Error())
+					} else {
+						this.log.Printf("BOT INFO: update %d from user %d %s", update.UpdateID, update.Message.Sender.ID, update.Message.Sender.UserName)
 					}
 				}
 				this.updatesOffset = update.UpdateID + 1

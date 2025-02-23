@@ -24,6 +24,16 @@ func (this check) empty() bool {
 	return this.Skill+this.Difficulty+this.Typ == 0
 }
 
+func (this check) closed() bool {
+	for _, attempt := range this.Attempts {
+		if attempt.Result == resCanceled ||
+			(attempt.Result != resDefault && this.Typ == typNonRetriable) {
+			return true
+		}
+	}
+	return false
+}
+
 func (this check) validate() error {
 	if this.Typ < typNonRetriable || this.Typ > typRetriable {
 		return fmt.Errorf("invalid type %d", this.Typ)
