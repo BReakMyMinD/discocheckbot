@@ -10,6 +10,7 @@ import (
 
 type dbAdapter interface {
 	createCheck(chk *check) error
+	createAttempt(att *attempt) error
 	init() error
 	listUserChecks(userId int64, offsetId int64) ([]check, error)
 	readCheck(checkId int64) (check, error)
@@ -120,16 +121,14 @@ func (this *DiscoCheckBot) OnCallbackQuery(bot *api.Bot, cbq *api.CallbackQuery)
 			if oper, err := strconv.Atoi(callbackParams[1]); err == nil {
 				switch oper {
 				case listCheckDetail:
-					chk, err := this.displayCheck(cbq, callbackParams)
+					chk, err := this.displayCheck(callbackParams)
 					if err != nil {
 						bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
 					} else {
 						bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
-						bot.EditMessageText(getSingleCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, cbq.Data, chk))
+						bot.EditMessageText(getSingleCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, chk))
 					}
 					return err
-				//case listCheckPrevious:
-				//	fallthrough
 				case listCheckNext:
 					list, err := this.updateListPage(cbq, callbackParams)
 					if err != nil {
@@ -137,6 +136,20 @@ func (this *DiscoCheckBot) OnCallbackQuery(bot *api.Bot, cbq *api.CallbackQuery)
 					} else {
 						bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
 						bot.EditMessageText(getListCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, list, callbackParams))
+					}
+					return err
+				case listCheckAction:
+					if _, err = this.makeCheckAttempt(cbq, callbackParams); err != nil {
+						bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
+					} else {
+						list, err := this.db.listUserChecks(cbq.Sender.ID, 0)
+						if err != nil {
+							bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
+						} else {
+							bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
+							bot.EditMessageText(getListCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, list,
+								[]string{seeTop, strconv.Itoa(listCheckNext), "0"}))
+						}
 					}
 					return err
 				}
@@ -191,7 +204,7 @@ func (this *DiscoCheckBot) receiveNewCheckName(msg *api.Message) (check, error) 
 	return chk, nil
 }
 
-func (this *DiscoCheckBot) displayCheck(cbq *api.CallbackQuery, clbkPar []string) (check, error) {
+func (this *DiscoCheckBot) displayCheck(clbkPar []string) (check, error) {
 	var chk check
 	var err error
 	if chk.Id, err = strconv.ParseInt(clbkPar[2], 10, 64); err != nil {
@@ -211,6 +224,24 @@ func (this *DiscoCheckBot) updateListPage(cbq *api.CallbackQuery, clbkPar []stri
 	}
 
 	return this.db.listUserChecks(cbq.Sender.ID, nextChkId)
+}
+
+func (this *DiscoCheckBot) makeCheckAttempt(cbq *api.CallbackQuery, clbkPar []string) (attempt, error) {
+	var att attempt
+	var err error
+	if att.CheckId, err = strconv.ParseInt(clbkPar[2], 10, 64); err != nil {
+		return att, err
+	}
+	if att.Result, err = strconv.Atoi(clbkPar[3]); err != nil {
+		return att, err
+	}
+	att.CreatedByMessage = cbq.Message.MessageID
+	att.CreatedByChat = cbq.Message.Chat.ID
+	if err = att.validate(); err != nil {
+		return att, err
+	}
+	err = this.db.createAttempt(&att)
+	return att, err
 }
 
 // func (this *DiscoCheckBot) showListCheckInitialPage(userId int64) error {

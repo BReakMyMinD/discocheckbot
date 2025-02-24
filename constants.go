@@ -128,4 +128,5 @@ var typeNames = [3]string{
 const (
 	listCheckDetail = iota
 	listCheckNext
+	listCheckAction
 )

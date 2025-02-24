@@ -71,9 +71,42 @@ func (this *psqlAdapter) createCheck(chk *check) error {
 	}
 	defer res.Close()
 	if !res.Next() {
-		return fmt.Errorf("insert not successful, no id returned")
+		return fmt.Errorf("insert checks not successful, no id returned")
 	}
 	res.Scan(&chk.Id)
+	return nil
+}
+
+func (this *psqlAdapter) createAttempt(att *attempt) error {
+	conn, err := this.connect()
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	res, err := conn.Query(
+		`INSERT INTO attempts (
+			check_id,
+			result,
+			created_at,
+			created_by_message,
+			created_by_chat
+			) VALUES (
+			$1, $2,
+			now()::timestamp,
+			$5, $6
+		) RETURNING attempt_id;`,
+		att.CheckId,
+		att.Result,
+		att.CreatedByMessage,
+		att.CreatedByChat)
+	if err != nil {
+		return err
+	}
+	defer res.Close()
+	if !res.Next() {
+		return fmt.Errorf("insert attempts not successful, no id returned")
+	}
+	res.Scan(&att.Id)
 	return nil
 }
 
@@ -126,12 +159,12 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64) ([]check, 
 		if err := moveCorresponding(rows, &chk); err != nil {
 			return nil, err
 		}
-		atmp := attempt{}
-		if err := moveCorresponding(rows, &atmp); err != nil {
+		att := attempt{}
+		if err := moveCorresponding(rows, &att); err != nil {
 			return nil, err
 		}
-		if atmp.Result != resDefault {
-			chk.Attempts = append(chk.Attempts, atmp)
+		if att.Result != resDefault {
+			chk.Attempts = append(chk.Attempts, att)
 		}
 		result = append(result, chk)
 	}
@@ -171,12 +204,12 @@ func (this *psqlAdapter) readCheck(checkId int64) (check, error) {
 				return check{}, err
 			}
 		}
-		atmp := attempt{}
-		if err := moveCorresponding(rows, &atmp); err != nil {
+		att := attempt{}
+		if err := moveCorresponding(rows, &att); err != nil {
 			return check{}, err
 		}
-		if atmp.Result != resDefault {
-			result.Attempts = append(result.Attempts, atmp)
+		if att.Result != resDefault {
+			result.Attempts = append(result.Attempts, att)
 		}
 	}
 	if result.empty() {

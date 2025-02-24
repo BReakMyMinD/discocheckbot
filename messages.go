@@ -139,9 +139,33 @@ func getListCheckEditMessage(chatId int64, msgId int, list []check, clbkPar []st
 	return emsg
 }
 
-func getSingleCheckEditMessage(chatId int64, msgId int, clbk string, chk check) api.EditMessageText {
-
-	emsg := api.EditMessageText{}
+func getSingleCheckEditMessage(chatId int64, msgId int, chk check) api.EditMessageText {
+	emsg := api.EditMessageText{
+		ChatID:    chatId,
+		MessageID: msgId,
+		Text: concat(typeNames[chk.Typ], ":\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty],
+			"\n", chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format(time.DateTime), "\n\n"),
+	}
+	for _, attempt := range chk.Attempts {
+		emsg.Text = concat(emsg.Text, "Attempt at ", attempt.CreatedAt.Format(time.DateTime), "\nResult: ",
+			resultNames[attempt.Result], "\n")
+	}
+	if !chk.closed() {
+		emsg.ReplyMarkup = &api.InlineKeyboardMarkup{
+			InlineKeyboard: [][]api.InlineKeyboardButton{
+				{{Text: resultNames[resSuccess], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resSuccess)}},
+				{{Text: resultNames[resFailure], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resFailure)}},
+				{{Text: resultNames[resCanceled], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resCanceled)}},
+				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckNext, 0)}},
+			},
+		}
+	} else {
+		emsg.ReplyMarkup = &api.InlineKeyboardMarkup{
+			InlineKeyboard: [][]api.InlineKeyboardButton{
+				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckNext, 0)}},
+			},
+		}
+	}
 	return emsg
 }
 
@@ -210,6 +234,18 @@ func makeClbk(start string, params ...int64) string {
 	}
 	return sb.String()
 }
+
+//type myStringsBuilder strings.Builder
+
+// func (this *myStringsBuilder) concat(str ...string) {
+// 	for _, s := range str {
+// 		this.WriteString(s)
+// 	}
+// }
+
+// func (this *myStringsBuilder) string() string {
+// 	return this.String()
+// }
 
 func concat(str ...string) string {
 	var sb strings.Builder

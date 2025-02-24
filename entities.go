@@ -54,9 +54,9 @@ func (this check) validate() error {
 
 type attempt struct {
 	// core logic attributes
-	Id       int64 `sql:"attempt_id"`
-	Check_id int64 `sql:"check_id"`
-	Result   int   `sql:"result"`
+	Id      int64 `sql:"attempt_id"`
+	CheckId int64 `sql:"check_id"`
+	Result  int   `sql:"result"`
 	//metadata attributes
 	CreatedByChat    int64     `sql:"created_by_chat"`
 	CreatedByMessage int       `sql:"created_by_message"`
@@ -66,6 +66,10 @@ type attempt struct {
 func (this attempt) validate() error {
 	if this.Result < resCanceled || this.Result > resFailure {
 		return fmt.Errorf("invalid result %d", this.Result)
+	}
+	if this.CreatedByChat == 0 ||
+		this.CreatedByMessage == 0 {
+		return fmt.Errorf("incomplete metadata")
 	}
 	return nil
 }
