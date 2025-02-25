@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"reflect"
+	"slices"
 
 	_ "github.com/lib/pq"
 )
@@ -93,7 +94,7 @@ func (this *psqlAdapter) createAttempt(att *attempt) error {
 			) VALUES (
 			$1, $2,
 			now()::timestamp,
-			$5, $6
+			$3, $4
 		) RETURNING attempt_id;`,
 		att.CheckId,
 		att.Result,
@@ -110,7 +111,23 @@ func (this *psqlAdapter) createAttempt(att *attempt) error {
 	return nil
 }
 
-func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64) ([]check, error) {
+func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64, desc bool) ([]check, error) {
+	var dynClause string
+	if desc {
+		dynClause = `WHERE u.updated_at > coalesce((
+							SELECT updated_at
+							FROM check_updates
+							WHERE check_id = $2
+						), to_timestamp('9999','YYYY'))
+						ORDER BY u.updated_at`
+	} else {
+		dynClause = `WHERE u.updated_at < coalesce((
+							SELECT updated_at
+							FROM check_updates
+							WHERE check_id = $2
+						), to_timestamp('9999','YYYY'))
+						ORDER BY u.updated_at DESC`
+	}
 	conn, err := this.connect()
 	if err != nil {
 		return nil, err
@@ -137,15 +154,7 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64) ([]check, 
 			u.result
 		FROM checks c 
 		JOIN check_updates u 
-		ON c.check_id = u.check_id 
-		WHERE u.updated_at < coalesce(
-		(
-			SELECT updated_at
-			FROM check_updates
-			WHERE check_id = $2
-		), to_timestamp('9999','YYYY'))
-		ORDER BY updated_at DESC
-		LIMIT $3;`,
+		ON c.check_id = u.check_id `+dynClause+` LIMIT $3;`,
 		userId,
 		offsetId,
 		maxChecksAtListPage)
@@ -167,6 +176,9 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64) ([]check, 
 			chk.Attempts = append(chk.Attempts, att)
 		}
 		result = append(result, chk)
+	}
+	if desc {
+		slices.Reverse(result)
 	}
 	return result, nil
 }

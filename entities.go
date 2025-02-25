@@ -25,10 +25,14 @@ func (this check) empty() bool {
 }
 
 func (this check) closed() bool {
-	for _, attempt := range this.Attempts {
-		if attempt.Result == resCanceled ||
-			(attempt.Result != resDefault && this.Typ == typNonRetriable) {
+	if i := len(this.Attempts); i > 0 {
+		switch this.Attempts[len(this.Attempts)-1].Result {
+		case resCanceled:
+			fallthrough
+		case resSuccess:
 			return true
+		case resFailure:
+			return this.Typ != typRetriable
 		}
 	}
 	return false
@@ -64,7 +68,7 @@ type attempt struct {
 }
 
 func (this attempt) validate() error {
-	if this.Result < resCanceled || this.Result > resFailure {
+	if this.Result < resCanceled || this.Result > resSuccess {
 		return fmt.Errorf("invalid result %d", this.Result)
 	}
 	if this.CreatedByChat == 0 ||

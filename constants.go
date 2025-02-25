@@ -101,8 +101,8 @@ var difficultyNames = [10]string{
 const (
 	resDefault = iota
 	resCanceled
-	resSuccess
 	resFailure
+	resSuccess
 )
 
 // check result texts
@@ -127,6 +127,7 @@ var typeNames = [3]string{
 
 const (
 	listCheckDetail = iota
-	listCheckNext
+	listCheckForward
+	listCheckBackward
 	listCheckAction
 )

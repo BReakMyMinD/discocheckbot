@@ -69,6 +69,7 @@ func getSkillDifEditMessage(chatId int64, msgId int, clbk string) api.EditMessag
 func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage {
 	var btnList [][]api.InlineKeyboardButton
 	var btnRow []api.InlineKeyboardButton
+	var markup *api.InlineKeyboardMarkup
 	var listText string
 	var nextId int64
 	if len(list) > 0 {
@@ -78,8 +79,8 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 			nextId = list[len(list)-1].Id
 		}
 		btnRow = []api.InlineKeyboardButton{
-			{Text: "⬅️ newer", CallbackData: makeClbk(cmd, listCheckNext, 0)},
-			{Text: "older ➡️", CallbackData: makeClbk(cmd, listCheckNext, nextId, 0)},
+			{Text: "⬅️ newer", CallbackData: makeClbk(cmd, listCheckBackward, 0)},
+			{Text: "older ➡️", CallbackData: makeClbk(cmd, listCheckForward, nextId)},
 		}
 		btnList = append(btnList, btnRow)
 		btnRow = nil
@@ -105,30 +106,29 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 			btnRow = nil
 		}
 	}
+	if len(btnList) > 0 {
+		markup = &api.InlineKeyboardMarkup{InlineKeyboard: btnList}
+	}
 	smsg := api.SendMessage{
-		ChatID: chatId,
-		Text:   listText,
-		ReplyMarkup: &api.InlineKeyboardMarkup{
-			InlineKeyboard: btnList,
-		},
+		ChatID:      chatId,
+		Text:        listText,
+		ReplyMarkup: markup,
 	}
 	return smsg
 }
 
-func getListCheckEditMessage(chatId int64, msgId int, list []check, clbkPar []string) api.EditMessageText {
+func getListCheckEditMessage(chatId int64, msgId int, list []check /*clbkPar []string*/) api.EditMessageText {
 	baseMsg := getListCheckMessage(seeTop, chatId, list)
-	var reqId, prevId, nextId int64
-	prevId, _ = strconv.ParseInt(clbkPar[len(clbkPar)-1], 10, 64)
-	reqId, _ = strconv.ParseInt(clbkPar[2], 10, 64)
-
-	if len(list) < maxChecksAtListPage {
-		nextId = reqId
-		reqId = prevId
-	} else {
-		nextId = list[len(list)-1].Id
-	}
-	baseMsg.ReplyMarkup.InlineKeyboard[0][0].CallbackData = makeClbk(seeTop, listCheckNext, prevId)
-	baseMsg.ReplyMarkup.InlineKeyboard[0][1].CallbackData = makeClbk(seeTop, listCheckNext, nextId, reqId)
+	var prevId, nextId /*, additionalId*/ int64
+	// if len(clbkPar) > 3 {
+	// 	additionalId, _ = strconv.ParseInt(clbkPar[3], 10, 64)
+	// }
+	// prevId, _ = strconv.ParseInt(clbkPar[len(clbkPar)-1], 10, 64)
+	// reqId, _ = strconv.ParseInt(clbkPar[2], 10, 64)
+	prevId = list[0].Id
+	nextId = list[len(list)-1].Id
+	baseMsg.ReplyMarkup.InlineKeyboard[0][0].CallbackData = makeClbk(seeTop, listCheckBackward, prevId)
+	baseMsg.ReplyMarkup.InlineKeyboard[0][1].CallbackData = makeClbk(seeTop, listCheckForward, nextId)
 
 	emsg := api.EditMessageText{
 		ChatID:      chatId,
@@ -156,13 +156,13 @@ func getSingleCheckEditMessage(chatId int64, msgId int, chk check) api.EditMessa
 				{{Text: resultNames[resSuccess], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resSuccess)}},
 				{{Text: resultNames[resFailure], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resFailure)}},
 				{{Text: resultNames[resCanceled], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resCanceled)}},
-				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckNext, 0)}},
+				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckForward, 0)}},
 			},
 		}
 	} else {
 		emsg.ReplyMarkup = &api.InlineKeyboardMarkup{
 			InlineKeyboard: [][]api.InlineKeyboardButton{
-				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckNext, 0)}},
+				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckForward, 0)}},
 			},
 		}
 	}

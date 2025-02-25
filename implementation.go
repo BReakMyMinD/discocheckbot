@@ -12,7 +12,7 @@ type dbAdapter interface {
 	createCheck(chk *check) error
 	createAttempt(att *attempt) error
 	init() error
-	listUserChecks(userId int64, offsetId int64) ([]check, error)
+	listUserChecks(userId int64, offsetId int64, desc bool) ([]check, error)
 	readCheck(checkId int64) (check, error)
 }
 
@@ -77,7 +77,7 @@ func (this *DiscoCheckBot) OnMessage(bot *api.Bot, msg *api.Message) error {
 		case addRed:
 			bot.SendMessage(getSkillMessage(command, msg.Chat.ID, typNonRetriable))
 		case seeTop:
-			list, err := this.db.listUserChecks(msg.Sender.ID, 0)
+			list, err := this.db.listUserChecks(msg.Sender.ID, 0, false)
 			if err != nil {
 				bot.SendMessage(getErrorMessage(msg.Chat.ID, err))
 			} else {
@@ -129,26 +129,31 @@ func (this *DiscoCheckBot) OnCallbackQuery(bot *api.Bot, cbq *api.CallbackQuery)
 						bot.EditMessageText(getSingleCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, chk))
 					}
 					return err
-				case listCheckNext:
+				case listCheckForward:
+					fallthrough
+				case listCheckBackward:
 					list, err := this.updateListPage(cbq, callbackParams)
 					if err != nil {
 						bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
 					} else {
 						bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
-						bot.EditMessageText(getListCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, list, callbackParams))
+						if len(list) > 0 {
+							bot.EditMessageText(getListCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, list))
+						}
 					}
 					return err
 				case listCheckAction:
 					if _, err = this.makeCheckAttempt(cbq, callbackParams); err != nil {
 						bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
 					} else {
-						list, err := this.db.listUserChecks(cbq.Sender.ID, 0)
+						list, err := this.db.listUserChecks(cbq.Sender.ID, 0, false)
 						if err != nil {
 							bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
 						} else {
 							bot.AnswerCallbackQuery(getCbqAnswer(cbq.ID, ""))
-							bot.EditMessageText(getListCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, list,
-								[]string{seeTop, strconv.Itoa(listCheckNext), "0"}))
+							if len(list) > 0 {
+								bot.EditMessageText(getListCheckEditMessage(cbq.Message.Chat.ID, cbq.Message.MessageID, list))
+							}
 						}
 					}
 					return err
@@ -218,12 +223,12 @@ func (this *DiscoCheckBot) updateListPage(cbq *api.CallbackQuery, clbkPar []stri
 	list := make([]check, 0)
 	var err error
 	//test
-
+	oper, _ := strconv.Atoi(clbkPar[1])
 	if nextChkId, err = strconv.ParseInt(clbkPar[2], 10, 64); err != nil {
 		return list, err
 	}
 
-	return this.db.listUserChecks(cbq.Sender.ID, nextChkId)
+	return this.db.listUserChecks(cbq.Sender.ID, nextChkId, oper == listCheckBackward)
 }
 
 func (this *DiscoCheckBot) makeCheckAttempt(cbq *api.CallbackQuery, clbkPar []string) (attempt, error) {
