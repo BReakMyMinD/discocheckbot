@@ -125,7 +125,7 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64, desc bool)
 							SELECT updated_at
 							FROM check_updates
 							WHERE check_id = $2
-						), to_timestamp('9999','YYYY'))
+						), to_timestamp(0))
 						ORDER BY u.updated_at DESC`
 	}
 	conn, err := this.connect()

@@ -248,13 +248,3 @@ func (this *DiscoCheckBot) makeCheckAttempt(cbq *api.CallbackQuery, clbkPar []st
 	err = this.db.createAttempt(&att)
 	return att, err
 }
-
-// func (this *DiscoCheckBot) showListCheckInitialPage(userId int64) error {
-// 	checks, err := this.db.listUserChecks(userId, 0)
-// 	if err != nil {
-// 		return err
-// 	}
-// 	for check, i := range checks {
-
-// 	}
-// }

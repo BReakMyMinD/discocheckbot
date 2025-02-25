@@ -117,14 +117,9 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 	return smsg
 }
 
-func getListCheckEditMessage(chatId int64, msgId int, list []check /*clbkPar []string*/) api.EditMessageText {
+func getListCheckEditMessage(chatId int64, msgId int, list []check) api.EditMessageText {
 	baseMsg := getListCheckMessage(seeTop, chatId, list)
-	var prevId, nextId /*, additionalId*/ int64
-	// if len(clbkPar) > 3 {
-	// 	additionalId, _ = strconv.ParseInt(clbkPar[3], 10, 64)
-	// }
-	// prevId, _ = strconv.ParseInt(clbkPar[len(clbkPar)-1], 10, 64)
-	// reqId, _ = strconv.ParseInt(clbkPar[2], 10, 64)
+	var prevId, nextId int64
 	prevId = list[0].Id
 	nextId = list[len(list)-1].Id
 	baseMsg.ReplyMarkup.InlineKeyboard[0][0].CallbackData = makeClbk(seeTop, listCheckBackward, prevId)
