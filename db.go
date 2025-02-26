@@ -21,6 +21,9 @@ func newPsqlAdapter(host, user, password, db string, port int) (*psqlAdapter, er
 	}
 	if db, err := adapter.connect(); err != nil {
 		return nil, err
+	} else if err = db.Ping(); err != nil {
+		db.Close()
+		return nil, err
 	} else {
 		db.Close()
 		return &adapter, nil
@@ -28,15 +31,7 @@ func newPsqlAdapter(host, user, password, db string, port int) (*psqlAdapter, er
 }
 
 func (this *psqlAdapter) connect() (*sql.DB, error) {
-	db, err := sql.Open("postgres", this.connStr)
-	if err != nil {
-		return nil, err
-	}
-	if err = db.Ping(); err != nil {
-		db.Close()
-		return nil, err
-	}
-	return db, nil
+	return sql.Open("postgres", this.connStr)
 }
 
 func (this *psqlAdapter) createCheck(chk *check) error {
@@ -125,7 +120,7 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64, desc bool)
 							SELECT updated_at
 							FROM check_updates
 							WHERE check_id = $2
-						), to_timestamp(0))
+						), to_timestamp('9999','YYYY'))
 						ORDER BY u.updated_at DESC`
 	}
 	conn, err := this.connect()

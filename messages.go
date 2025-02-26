@@ -4,14 +4,14 @@ import (
 	"discocheckbot/api"
 	"strconv"
 	"strings"
-	"time"
+	"unicode/utf16"
 )
 
 func getSkillMessage(cmd string, chatId int64, color int) api.SendMessage {
 	chkColor := int64(color)
 	smsg := api.SendMessage{
 		ChatID: chatId,
-		Text:   "select skill:",
+		Text:   "Select skill:",
 		ReplyMarkup: &api.InlineKeyboardMarkup{
 			InlineKeyboard: [][]api.InlineKeyboardButton{
 				{{Text: skillNames[intLogic], CallbackData: makeClbk(cmd, chkColor, intLogic)},
@@ -48,7 +48,7 @@ func getSkillDifEditMessage(chatId int64, msgId int, clbk string) api.EditMessag
 	emsg := api.EditMessageText{
 		ChatID:    chatId,
 		MessageID: msgId,
-		Text:      "select check difficulty:",
+		Text:      "Select check difficulty:",
 		ReplyMarkup: &api.InlineKeyboardMarkup{
 			InlineKeyboard: [][]api.InlineKeyboardButton{
 				{{Text: difficultyNames[difTrivial], CallbackData: makeClbk(clbk, difTrivial)}},
@@ -70,8 +70,9 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 	var btnList [][]api.InlineKeyboardButton
 	var btnRow []api.InlineKeyboardButton
 	var markup *api.InlineKeyboardMarkup
-	var listText string
+	var format []api.MessageEntity
 	var nextId int64
+	var msgText myStringsBuilder
 	if len(list) > 0 {
 		if len(list) < maxChecksAtListPage {
 			nextId = 0
@@ -79,29 +80,52 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 			nextId = list[len(list)-1].Id
 		}
 		btnRow = []api.InlineKeyboardButton{
-			{Text: "⬅️ newer", CallbackData: makeClbk(cmd, listCheckBackward, 0)},
-			{Text: "older ➡️", CallbackData: makeClbk(cmd, listCheckForward, nextId)},
+			{Text: "⬅️ Newer", CallbackData: makeClbk(cmd, listCheckBackward, 0)},
+			{Text: "Older ➡️", CallbackData: makeClbk(cmd, listCheckForward, nextId)},
 		}
 		btnList = append(btnList, btnRow)
 		btnRow = nil
 	} else {
-		listText = "You have no checks at the moment"
+		msgText.sb.WriteString("You have no checks at the moment")
 	}
 	for i, chk := range list {
+		crossBegin := 0
+		crossEnd := 0
+		boldBegin := 0
+		boldEnd := 0
 		res := 0
+		sep := " "
 		if chk.closed() {
+			sep = " - "
 			res = chk.Attempts[len(chk.Attempts)-1].Result
+			crossBegin = len(utf16.Encode([]rune(msgText.sb.String())))
+			if crossBegin > 0 {
+				crossBegin--
+			}
 		}
-		listText = concat(
-			listText, strconv.Itoa(i+1), ". ", typeNames[chk.Typ], " ", resultNames[res],
-			"\n", skillNames[chk.Skill], "/",
-			difficultyNames[chk.Difficulty],
-			"\n", chk.Description, "\n\n")
+		msgText.concat(strconv.Itoa(i+1), ". ", typeNames[chk.Typ], sep, resultNames[res], "\n")
+		boldBegin = len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+		msgText.concat(skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty], "\n")
+		boldEnd = len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+		msgText.sb.WriteString(chk.Description)
+		if chk.closed() {
+			crossEnd = len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+			format = append(format, api.MessageEntity{
+				Type:   api.CrossedEntity,
+				Offset: crossBegin,
+				Length: crossEnd - crossBegin})
+		}
+		format = append(format, api.MessageEntity{
+			Type:   api.BoldEntity,
+			Offset: boldBegin,
+			Length: boldEnd - boldBegin,
+		})
+		msgText.sb.WriteString("\n\n")
 		btnRow = append(btnRow, api.InlineKeyboardButton{
 			Text:         strconv.Itoa(i + 1),
 			CallbackData: makeClbk(cmd, listCheckDetail, chk.Id),
 		})
-		if (i+1)%3 == 0 || i+1 == len(list) { //todo constant max buttons
+		if (i+1)%maxCheckBtnInRow == 0 || i+1 == len(list) {
 			btnList = append(btnList, btnRow)
 			btnRow = nil
 		}
@@ -111,8 +135,9 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 	}
 	smsg := api.SendMessage{
 		ChatID:      chatId,
-		Text:        listText,
+		Text:        msgText.sb.String(),
 		ReplyMarkup: markup,
+		Entities:    format,
 	}
 	return smsg
 }
@@ -130,34 +155,37 @@ func getListCheckEditMessage(chatId int64, msgId int, list []check) api.EditMess
 		MessageID:   msgId,
 		Text:        baseMsg.Text,
 		ReplyMarkup: baseMsg.ReplyMarkup,
+		Entities:    baseMsg.Entities,
 	}
 	return emsg
 }
 
 func getSingleCheckEditMessage(chatId int64, msgId int, chk check) api.EditMessageText {
+	var msgText myStringsBuilder
+	msgText.concat(typeNames[chk.Typ], ":\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty],
+		"\n", chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format("2.01.2006 15:04"), "\n\n")
 	emsg := api.EditMessageText{
 		ChatID:    chatId,
 		MessageID: msgId,
-		Text: concat(typeNames[chk.Typ], ":\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty],
-			"\n", chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format(time.DateTime), "\n\n"),
 	}
 	for _, attempt := range chk.Attempts {
-		emsg.Text = concat(emsg.Text, "Attempt at ", attempt.CreatedAt.Format(time.DateTime), "\nResult: ",
+		msgText.concat("Attempt at: ", attempt.CreatedAt.Format("2.01.2006 15:04"), "\nResult: ",
 			resultNames[attempt.Result], "\n")
 	}
+	emsg.Text = msgText.sb.String()
 	if !chk.closed() {
 		emsg.ReplyMarkup = &api.InlineKeyboardMarkup{
 			InlineKeyboard: [][]api.InlineKeyboardButton{
 				{{Text: resultNames[resSuccess], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resSuccess)}},
 				{{Text: resultNames[resFailure], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resFailure)}},
 				{{Text: resultNames[resCanceled], CallbackData: makeClbk(seeTop, listCheckAction, chk.Id, resCanceled)}},
-				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckForward, 0)}},
+				{{Text: "Back", CallbackData: makeClbk(seeTop, listCheckForward, 0)}},
 			},
 		}
 	} else {
 		emsg.ReplyMarkup = &api.InlineKeyboardMarkup{
 			InlineKeyboard: [][]api.InlineKeyboardButton{
-				{{Text: "back", CallbackData: makeClbk(seeTop, listCheckForward, 0)}},
+				{{Text: "Back", CallbackData: makeClbk(seeTop, listCheckForward, 0)}},
 			},
 		}
 	}
@@ -165,27 +193,33 @@ func getSingleCheckEditMessage(chatId int64, msgId int, chk check) api.EditMessa
 }
 
 func getSingleCheckMessage(chatId int64, chk check) api.SendMessage {
+	var msgText myStringsBuilder
+	msgText.concat(typeNames[chk.Typ], ":\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty],
+		"\n", chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format("2.01.2006 15:04"))
 	smsg := api.SendMessage{
 		ChatID: chatId,
-		Text: concat(typeNames[chk.Typ], ":\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty],
-			"\n", chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format(time.DateTime)),
+		Text:   msgText.sb.String(),
 	}
 	return smsg
 }
 
 func getSkillTxtEditMessage(chatId int64, msgId int, chk check) api.EditMessageText {
+	var msgText myStringsBuilder
+	msgText.concat("Enter descrption of the check:\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty])
 	emsg := api.EditMessageText{
 		ChatID:    chatId,
 		MessageID: msgId,
-		Text:      concat("enter descrption of the check:\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty]),
+		Text:      msgText.sb.String(),
 	}
 	return emsg
 }
 
 func getErrorMessage(chatId int64, err error) api.SendMessage {
+	var msgText myStringsBuilder
+	msgText.concat("Update was not handled due to error:\n", err.Error())
 	smsg := api.SendMessage{
 		ChatID: chatId,
-		Text:   concat("update was not handled due to:\n", err.Error()),
+		Text:   msgText.sb.String(),
 	}
 	return smsg
 }
@@ -193,8 +227,9 @@ func getErrorMessage(chatId int64, err error) api.SendMessage {
 func getStartMessage(chatId int64) api.SendMessage {
 	smsg := api.SendMessage{
 		ChatID: chatId,
-		Text: `Welcome!\nYou are able to create new /white, retriable checks, and /red, non-retriable checks.\n
-			   Use /top command in order to discover your checks and make an attempt to pass these checks:\n`,
+		Text: `Welcome!
+				You are able to create new /white, retriable checks, and /red, non-retriable checks.
+			    Use /top command in order to discover your checks and make an attempt to pass them`,
 	}
 	return smsg
 }
@@ -208,9 +243,11 @@ func getCbqAnswer(cbqId string, text string) api.AnswerCallbackQuery {
 }
 
 func getErrorCbqAnswer(cbqId string, err error) api.AnswerCallbackQuery {
+	var msgText myStringsBuilder
+	msgText.concat("Update was not handled due to error:\n", err.Error())
 	answer := api.AnswerCallbackQuery{
 		CallbackQueryId: cbqId,
-		Text:            err.Error(),
+		Text:            msgText.sb.String(),
 		ShowAlert:       true,
 	}
 	return answer
@@ -230,22 +267,16 @@ func makeClbk(start string, params ...int64) string {
 	return sb.String()
 }
 
-//type myStringsBuilder strings.Builder
+// just the same as strings.Builder, but with multiple WriteString arguments
+type myStringsBuilder struct {
+	sb strings.Builder
+}
 
-// func (this *myStringsBuilder) concat(str ...string) {
-// 	for _, s := range str {
-// 		this.WriteString(s)
-// 	}
-// }
-
-// func (this *myStringsBuilder) string() string {
-// 	return this.String()
-// }
-
-func concat(str ...string) string {
-	var sb strings.Builder
+func (this *myStringsBuilder) concat(str ...string) int {
+	var totalLen int
 	for _, s := range str {
-		sb.WriteString(s)
+		slen, _ := this.sb.WriteString(s)
+		totalLen += slen
 	}
-	return sb.String()
+	return totalLen
 }

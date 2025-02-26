@@ -96,8 +96,6 @@ func (this *DiscoCheckBot) OnMessage(bot *api.Bot, msg *api.Message) error {
 func (this *DiscoCheckBot) OnCallbackQuery(bot *api.Bot, cbq *api.CallbackQuery) error {
 	delete(this.checkBuffer, cbq.Sender.ID)
 	callbackParams := strings.Split(cbq.Data, "/")
-	// switch len(callbackParams) {
-	// case 3:
 	if len(callbackParams) > 2 {
 		switch callbackParams[0] {
 		case addWhite:
@@ -222,7 +220,6 @@ func (this *DiscoCheckBot) updateListPage(cbq *api.CallbackQuery, clbkPar []stri
 	var nextChkId int64
 	list := make([]check, 0)
 	var err error
-	//test
 	oper, _ := strconv.Atoi(clbkPar[1])
 	if nextChkId, err = strconv.ParseInt(clbkPar[2], 10, 64); err != nil {
 		return list, err

@@ -16,6 +16,8 @@ import (
 // telegram bot API parameters
 const (
 	CommandEntity     string = "bot_command"
+	CrossedEntity     string = "strikethrough"
+	BoldEntity        string = "bold"
 	apiMethodTemplate string = "https://api.telegram.org/bot<TOKEN>/<METHOD>"
 	apiFileTemplate   string = "https://api.telegram.org/file/bot<TOKEN>/<PATH>"
 	UpdatesLimit      int    = 100 //todo move in config
@@ -89,15 +91,15 @@ func (this *Bot) ListenForUpdates() {
 			if update.UpdateID >= this.updatesOffset {
 				if update.CallbackQuery != nil {
 					if err = this.implementation.OnCallbackQuery(this, update.CallbackQuery); err != nil {
-						this.log.Printf("BOT ERROR: update %d from user %d %s\n%s", update.UpdateID, update.CallbackQuery.Sender.ID, update.CallbackQuery.Sender.UserName, err.Error())
+						this.log.Printf("BOT ERROR: update %+v\n%s", update.CallbackQuery, err.Error())
 					} else {
-						this.log.Printf("BOT INFO: update %d from user %d %s", update.UpdateID, update.CallbackQuery.Sender.ID, update.CallbackQuery.Sender.UserName)
+						this.log.Printf("BOT INFO: update %+v", update.CallbackQuery)
 					}
 				} else if update.Message != nil {
 					if err = this.implementation.OnMessage(this, update.Message); err != nil {
-						this.log.Printf("BOT ERROR: update %d from user %d %s\n%s", update.UpdateID, update.Message.Sender.ID, update.Message.Sender.UserName, err.Error())
+						this.log.Printf("BOT ERROR: update %+v\n%s", update.Message, err.Error())
 					} else {
-						this.log.Printf("BOT INFO: update %d from user %d %s", update.UpdateID, update.Message.Sender.ID, update.Message.Sender.UserName)
+						this.log.Printf("BOT INFO: update %+v", update.Message)
 					}
 				}
 				this.updatesOffset = update.UpdateID + 1
@@ -147,6 +149,7 @@ func (this *Bot) prepareApiUrl(apiMethod string, filePath string) string {
 }
 
 func (this *Bot) SendMessage(msg SendMessage) (*Message, error) {
+	this.log.Printf("sending %+v", msg)
 	retMsg, err := callApiMethod[SendMessage, *Message](this.prepareApiUrl("sendMessage", ""), msg)
 	if err != nil {
 		this.log.Println(err)
@@ -155,6 +158,7 @@ func (this *Bot) SendMessage(msg SendMessage) (*Message, error) {
 }
 
 func (this *Bot) EditMessageText(msg EditMessageText) (*Message, error) {
+	this.log.Printf("editing %+v", msg)
 	retMsg, err := callApiMethod[EditMessageText, *Message](this.prepareApiUrl("editMessageText", ""), msg)
 	if err != nil {
 		this.log.Println(err)
@@ -163,6 +167,7 @@ func (this *Bot) EditMessageText(msg EditMessageText) (*Message, error) {
 }
 
 func (this *Bot) AnswerCallbackQuery(answer AnswerCallbackQuery) (*bool, error) {
+	this.log.Printf("answering %+v", answer)
 	retOk, err := callApiMethod[AnswerCallbackQuery, *bool](this.prepareApiUrl("answerCallbackQuery", ""), answer)
 	if err != nil {
 		this.log.Println(err)
@@ -205,7 +210,7 @@ func ParseCommand(message Message) (string, error) {
 			msgText16 := utf16.Encode([]rune(message.Text))
 			substrTo := entity.Offset + entity.Length
 			if substrTo > len(msgText16) {
-				return "", fmt.Errorf("user %d bad update: text too short", message.Sender.ID)
+				return "", fmt.Errorf("chat %d message %d bad command: text too short", message.Chat.ID, message.MessageID)
 			}
 			command16 := msgText16[entity.Offset+1 : substrTo] // omit slash
 			command = string(utf16.Decode(command16))

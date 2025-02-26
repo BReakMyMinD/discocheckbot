@@ -1,6 +1,9 @@
 package main
 
-const maxChecksAtListPage int = 9
+const (
+	maxChecksAtListPage int = 9
+	maxCheckBtnInRow    int = 3
+)
 
 // commands
 const (
@@ -108,9 +111,9 @@ const (
 // check result texts
 var resultNames = [4]string{
 	"",
-	"Canceled",
-	"Failure!",
-	"Success!",
+	"Cancel 🚫",
+	"Failure 🔴",
+	"Success 🟢",
 }
 
 const (
