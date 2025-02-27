@@ -4,16 +4,16 @@ import (
 	"discocheckbot/api"
 	"discocheckbot/config"
 	"log"
-	"os" //todo log in file, not stdout
+	"os"
 )
 
 func main() {
 	log := log.New(os.Stdout, "", log.Ldate|log.Ltime)
 	log.Println("starting bot...")
 
-	config, err := config.NewConfigReader("./config.json") //for debug, by default "config.json"
+	config, err := config.NewConfigReader("./config.json")
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln(err.Error())
 	}
 	dcbot, err := NewDiscoCheckBot(config)
 	if err != nil {
