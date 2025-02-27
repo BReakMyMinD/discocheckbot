@@ -3,6 +3,7 @@ package main
 import (
 	"discocheckbot/api"
 	"discocheckbot/config"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -159,7 +160,7 @@ func (this *DiscoCheckBot) OnCallbackQuery(bot *api.Bot, cbq *api.CallbackQuery)
 			}
 		}
 	}
-	err := fmt.Errorf("invalid callback data")
+	err := errors.New("invalid callback data")
 	bot.AnswerCallbackQuery(getErrorCbqAnswer(cbq.ID, err))
 	return err
 }

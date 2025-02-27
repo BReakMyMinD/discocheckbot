@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -51,7 +52,7 @@ func (this check) validate() error {
 	if this.CreatedByUser == 0 ||
 		this.CreatedByChat == 0 ||
 		this.CreatedByMessage == 0 {
-		return fmt.Errorf("incomplete metadata")
+		return errors.New("incomplete metadata")
 	}
 	return nil
 }
@@ -73,7 +74,7 @@ func (this attempt) validate() error {
 	}
 	if this.CreatedByChat == 0 ||
 		this.CreatedByMessage == 0 {
-		return fmt.Errorf("incomplete metadata")
+		return errors.New("incomplete metadata")
 	}
 	return nil
 }

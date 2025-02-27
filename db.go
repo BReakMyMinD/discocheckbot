@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"reflect"
 	"slices"
@@ -67,7 +68,7 @@ func (this *psqlAdapter) createCheck(chk *check) error {
 	}
 	defer res.Close()
 	if !res.Next() {
-		return fmt.Errorf("insert checks not successful, no id returned")
+		return errors.New("insert checks not successful, no id returned")
 	}
 	res.Scan(&chk.Id)
 	return nil
@@ -100,7 +101,7 @@ func (this *psqlAdapter) createAttempt(att *attempt) error {
 	}
 	defer res.Close()
 	if !res.Next() {
-		return fmt.Errorf("insert attempts not successful, no id returned")
+		return errors.New("insert attempts not successful, no id returned")
 	}
 	res.Scan(&att.Id)
 	return nil

@@ -93,7 +93,7 @@ func (this *Bot) ListenForUpdates() {
 		log.Printf("INFO: requesting updates from %d", this.updatesOffset)
 		updates, err := callApiMethod[RequestUpdates, []Update](this.prepareApiUrl("getUpdates", ""), requestBody)
 		if err != nil {
-			log.Println(err)
+			log.Printf("ERROR: %s, retrying in %d seconds", err.Error(), this.httpErrorRetry)
 			time.Sleep(time.Second * time.Duration(this.httpErrorRetry))
 			continue
 		}

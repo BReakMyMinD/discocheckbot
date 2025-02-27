@@ -105,7 +105,7 @@ func getListCheckMessage(cmd string, chatId int64, list []check) api.SendMessage
 		}
 		msgText.concat(strconv.Itoa(i+1), ". ", typeNames[chk.Typ], sep, resultNames[res], "\n")
 		boldBegin = len(utf16.Encode([]rune(msgText.sb.String()))) - 1
-		msgText.concat(skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty], "\n")
+		msgText.concat(skillNames[chk.Skill], " - ", difficultyNames[chk.Difficulty], "\n")
 		boldEnd = len(utf16.Encode([]rune(msgText.sb.String()))) - 1
 		msgText.sb.WriteString(chk.Description)
 		if chk.closed() {
@@ -162,11 +162,16 @@ func getListCheckEditMessage(chatId int64, msgId int, list []check) api.EditMess
 
 func getSingleCheckEditMessage(chatId int64, msgId int, chk check) api.EditMessageText {
 	var msgText myStringsBuilder
-	msgText.concat(typeNames[chk.Typ], ":\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty],
-		"\n", chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format("2.01.2006 15:04"), "\n\n")
+	msgText.concat(typeNames[chk.Typ], ":\n")
+	boldBegin := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+	msgText.concat(skillNames[chk.Skill], " - ", difficultyNames[chk.Difficulty], "\n")
+	boldEnd := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+	msgText.concat(chk.Description, "\n\n")
+
 	emsg := api.EditMessageText{
 		ChatID:    chatId,
 		MessageID: msgId,
+		Entities:  []api.MessageEntity{{Type: api.BoldEntity, Offset: boldBegin, Length: boldEnd - boldBegin}},
 	}
 	for _, attempt := range chk.Attempts {
 		msgText.concat("Attempt at: ", attempt.CreatedAt.Format("2.01.2006 15:04"), "\nResult: ",
@@ -194,29 +199,37 @@ func getSingleCheckEditMessage(chatId int64, msgId int, chk check) api.EditMessa
 
 func getSingleCheckMessage(chatId int64, chk check) api.SendMessage {
 	var msgText myStringsBuilder
-	msgText.concat(typeNames[chk.Typ], ":\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty],
-		"\n", chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format("2.01.2006 15:04"))
+	msgText.concat(typeNames[chk.Typ], ":\n")
+	boldBegin := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+	msgText.concat(skillNames[chk.Skill], " - ", difficultyNames[chk.Difficulty], "\n")
+	boldEnd := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+	msgText.concat(chk.Description, "\n\nCreated at: ", chk.CreatedAt.Format("2.01.2006 15:04"))
 	smsg := api.SendMessage{
-		ChatID: chatId,
-		Text:   msgText.sb.String(),
+		ChatID:   chatId,
+		Text:     msgText.sb.String(),
+		Entities: []api.MessageEntity{{Type: api.BoldEntity, Offset: boldBegin, Length: boldEnd - boldBegin}},
 	}
 	return smsg
 }
 
 func getSkillTxtEditMessage(chatId int64, msgId int, chk check) api.EditMessageText {
 	var msgText myStringsBuilder
-	msgText.concat("Enter descrption of the check:\n", skillNames[chk.Skill], "/", difficultyNames[chk.Difficulty])
+	msgText.concat("Enter descrption of the check:\n")
+	boldBegin := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
+	msgText.concat(skillNames[chk.Skill], " - ", difficultyNames[chk.Difficulty], "\n")
+	boldEnd := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
 	emsg := api.EditMessageText{
 		ChatID:    chatId,
 		MessageID: msgId,
 		Text:      msgText.sb.String(),
+		Entities:  []api.MessageEntity{{Type: api.BoldEntity, Offset: boldBegin, Length: boldEnd - boldBegin}},
 	}
 	return emsg
 }
 
 func getErrorMessage(chatId int64, err error) api.SendMessage {
 	var msgText myStringsBuilder
-	msgText.concat("Update was not handled due to error:\n", err.Error())
+	msgText.concat("Request was not handled due to error:\n", err.Error())
 	smsg := api.SendMessage{
 		ChatID: chatId,
 		Text:   msgText.sb.String(),
@@ -244,7 +257,7 @@ func getCbqAnswer(cbqId string, text string) api.AnswerCallbackQuery {
 
 func getErrorCbqAnswer(cbqId string, err error) api.AnswerCallbackQuery {
 	var msgText myStringsBuilder
-	msgText.concat("Update was not handled due to error:\n", err.Error())
+	msgText.concat("Request was not handled due to error:\n", err.Error())
 	answer := api.AnswerCallbackQuery{
 		CallbackQueryId: cbqId,
 		Text:            msgText.sb.String(),
