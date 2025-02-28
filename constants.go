@@ -11,7 +11,6 @@ const (
 	addWhite string = "white"
 	addRed   string = "red"
 	seeTop   string = "top"
-	seeLog   string = "log"
 )
 
 // skill identifiers

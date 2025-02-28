@@ -134,7 +134,7 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64, desc bool)
 			SELECT DISTINCT ON(check_id)
 				c.check_id,
 				coalesce(a.result,0) AS result,
-				CASE WHEN a.created_at IS NULL THEN c.created_at ELSE a.created_at END AS updated_at
+				coalesce(a.created_at,c.created_at) AS updated_at
 		  	FROM checks c
 			LEFT JOIN attempts a
 			ON c.check_id = a.check_id
