@@ -29,43 +29,38 @@ type BotImplementation interface {
 }
 
 type Bot struct {
-	token          string
-	updatesOffset  int
-	updatesLimit   int
-	httpErrorRetry int //seconds
-	httpTimeout    int //seconds
-	log            *log.Logger
-	implementation BotImplementation
+	token           string
+	updatesOffset   int
+	updatesLimit    int
+	reqUpdatesRetry int //seconds
+	httpTimeout     int //seconds
+	log             *log.Logger
+	implementation  BotImplementation
 }
 
-func NewBot(cfg *config.ConfigReader, log *log.Logger, impl BotImplementation) *Bot {
+func NewBot(cfg *config.ConfigReader, log *log.Logger, impl BotImplementation) (*Bot, error) {
 	var token string
-	var httpTimeout, httpErrorRetry, updatesLimit float64 //json number interprets as float64!
+	var httpTimeout, reqUpdatesRetry, updatesLimit float64 //json number interprets as float64!
 	var err error
-
 	//reading config
 	if err = cfg.GetParameter("bot_token", &token); err != nil {
-		log.Println(err)
-		return nil
+		return nil, err
 	}
 	if err = cfg.GetParameter("long_polling_timeout", &httpTimeout); err != nil {
-		log.Println(err)
-		return nil
+		return nil, err
 	}
-	if err = cfg.GetParameter("http_error_retry_sec", &httpErrorRetry); err != nil {
-		log.Println(err)
-		return nil
+	if err = cfg.GetParameter("request_updates_retry", &reqUpdatesRetry); err != nil {
+		return nil, err
 	}
 	if err = cfg.GetParameter("updates_limit", &updatesLimit); err != nil {
-		log.Println(err)
-		return nil
+		return nil, err
 	}
 	//initializing bot
 	bot := Bot{
 		token,
 		0,
 		int(updatesLimit),
-		int(httpErrorRetry),
+		int(reqUpdatesRetry),
 		int(httpTimeout),
 		log,
 		impl,
@@ -76,10 +71,9 @@ func NewBot(cfg *config.ConfigReader, log *log.Logger, impl BotImplementation) *
 		"",
 		nil)
 	if err != nil {
-		log.Println(err)
-		return nil
+		return nil, err
 	}
-	return &bot
+	return &bot, nil
 }
 
 func (this *Bot) ListenForUpdates() {
@@ -90,19 +84,19 @@ func (this *Bot) ListenForUpdates() {
 			this.httpTimeout,
 			[]string{"message", "callback_query"},
 		}
-		log.Printf("INFO: requesting updates from %d", this.updatesOffset)
+		log.Printf("INFO: requesting updates from %d\n", this.updatesOffset)
 		updates, err := callApiMethod[RequestUpdates, []Update](this.prepareApiUrl("getUpdates", ""), requestBody)
 		if err != nil {
-			log.Printf("ERROR: %s, retrying in %d seconds", err.Error(), this.httpErrorRetry)
-			time.Sleep(time.Second * time.Duration(this.httpErrorRetry))
+			log.Printf("ERROR: %v, retrying in %d seconds\n", err, this.reqUpdatesRetry)
+			time.Sleep(time.Second * time.Duration(this.reqUpdatesRetry))
 			continue
 		}
 		for _, update := range updates {
 			if update.UpdateID >= this.updatesOffset {
 				if update.CallbackQuery != nil {
 					if err = this.implementation.OnCallbackQuery(this, update.CallbackQuery); err != nil {
-						this.log.Printf("BOT ERROR %s: callback query %s\nfrom %+v\nchat %d\nmessage %d\nwith %s\n",
-							err.Error(),
+						this.log.Printf("BOT ERROR: %v: callback query %s\nfrom %+v\nchat %d\nmessage %d\nwith %s\n",
+							err,
 							update.CallbackQuery.ID,
 							update.CallbackQuery.Sender,
 							update.CallbackQuery.Message.Chat.ID,
@@ -118,8 +112,8 @@ func (this *Bot) ListenForUpdates() {
 					}
 				} else if update.Message != nil {
 					if err = this.implementation.OnMessage(this, update.Message); err != nil {
-						this.log.Printf("BOT ERROR %s: message %d\nfrom %+v\nchat %d\nwith %s\n",
-							err.Error(),
+						this.log.Printf("BOT ERROR: %v: message %d\nfrom %+v\nchat %d\nwith %s\n",
+							err,
 							update.Message.MessageID,
 							update.Message.Sender,
 							update.Message.Chat.ID,
@@ -181,8 +175,8 @@ func (this *Bot) prepareApiUrl(apiMethod string, filePath string) string {
 func (this *Bot) SendMessage(msg SendMessage) (*Message, error) {
 	retMsg, err := callApiMethod[SendMessage, *Message](this.prepareApiUrl("sendMessage", ""), msg)
 	if err != nil {
-		this.log.Printf("ERROR %s: send message chat %d\n",
-			err.Error(),
+		this.log.Printf("ERROR: %v: send message chat %d\n",
+			err,
 			msg.ChatID)
 	} else {
 		this.log.Printf("INFO: send message %d\nchat %d\n",
@@ -195,8 +189,8 @@ func (this *Bot) SendMessage(msg SendMessage) (*Message, error) {
 func (this *Bot) EditMessageText(msg EditMessageText) (*Message, error) {
 	retMsg, err := callApiMethod[EditMessageText, *Message](this.prepareApiUrl("editMessageText", ""), msg)
 	if err != nil {
-		this.log.Printf("ERROR %s: edit message %d\nchat %d\n",
-			err.Error(),
+		this.log.Printf("ERROR: %v: edit message %d\nchat %d\n",
+			err,
 			msg.MessageID,
 			msg.ChatID)
 	} else {
@@ -211,11 +205,11 @@ func (this *Bot) EditMessageText(msg EditMessageText) (*Message, error) {
 func (this *Bot) AnswerCallbackQuery(answer AnswerCallbackQuery) (*bool, error) {
 	retOk, err := callApiMethod[AnswerCallbackQuery, *bool](this.prepareApiUrl("answerCallbackQuery", ""), answer)
 	if err != nil {
-		this.log.Printf("ERROR %s: answer callback query %s",
-			err.Error(),
+		this.log.Printf("ERROR %v: answer callback query %s\n",
+			err,
 			answer.CallbackQueryId)
 	} else {
-		this.log.Printf("INFO: answer callback query %s",
+		this.log.Printf("INFO: answer callback query %s\n",
 			answer.CallbackQueryId)
 	}
 	return retOk, err

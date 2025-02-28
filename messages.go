@@ -214,7 +214,7 @@ func getSingleCheckMessage(chatId int64, chk check) api.SendMessage {
 
 func getSkillTxtEditMessage(chatId int64, msgId int, chk check) api.EditMessageText {
 	var msgText myStringsBuilder
-	msgText.concat("Enter descrption of the check:\n")
+	msgText.concat("Enter description of the check:\n")
 	boldBegin := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
 	msgText.concat(skillNames[chk.Skill], " - ", difficultyNames[chk.Difficulty], "\n")
 	boldEnd := len(utf16.Encode([]rune(msgText.sb.String()))) - 1
@@ -241,8 +241,8 @@ func getStartMessage(chatId int64) api.SendMessage {
 	smsg := api.SendMessage{
 		ChatID: chatId,
 		Text: `Welcome!
-				You are able to create new /white, retriable checks, and /red, non-retriable checks.
-			    Use /top command in order to discover your checks and make an attempt to pass them`,
+You are able to create new /white, retriable checks, and /red, non-retriable checks.
+Use /top command in order to discover your checks and make an attempt to pass them.`,
 	}
 	return smsg
 }

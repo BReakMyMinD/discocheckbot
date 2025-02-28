@@ -115,14 +115,14 @@ func (this *psqlAdapter) listUserChecks(userId int64, offsetId int64, desc bool)
 							FROM check_updates
 							WHERE check_id = $2
 						), to_timestamp('9999','YYYY'))
-						ORDER BY u.updated_at`
+					ORDER BY u.updated_at`
 	} else {
 		dynClause = `WHERE u.updated_at < coalesce((
 							SELECT updated_at
 							FROM check_updates
 							WHERE check_id = $2
 						), to_timestamp('9999','YYYY'))
-						ORDER BY u.updated_at DESC`
+					ORDER BY u.updated_at DESC`
 	}
 	conn, err := this.connect()
 	if err != nil {

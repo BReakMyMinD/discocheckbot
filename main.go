@@ -19,10 +19,10 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	bot := api.NewBot(config, log, dcbot)
-	if bot != nil {
-		bot.ListenForUpdates()
+	bot, err := api.NewBot(config, log, dcbot)
+	if err != nil {
+		log.Fatalln(err)
 	}
-
+	bot.ListenForUpdates()
 	log.Fatalln("bot terminated")
 }
